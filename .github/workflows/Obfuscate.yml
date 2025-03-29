@@ -1,0 +1,75 @@
+name: Build Obfuscate BPB Panel
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+
+      - name: Cache Node.js modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: |
+          npm install -g javascript-obfuscator
+
+      - name: Debug environment
+        run: |
+          echo "PATH: $PATH"
+          node -v
+          npm -v
+          which javascript-obfuscator
+
+      - name: Clone BPB workjs
+        run: |
+          wget -O origin.js https://raw.githubusercontent.com/bia-pain-bache/BPB-Worker-Panel/refs/heads/main/build/unobfuscated-worker.js
+
+      - name: Check javascript-obfuscator installation
+        run: |
+          if! command -v javascript-obfuscator &> /dev/null
+          then
+              echo "javascript-obfuscator could not be found"
+              exit 1
+          fi
+
+      - name: Obfuscate BPB worker js
+        run: |
+          npx javascript-obfuscator origin.js --output _worker.js \
+          --compact true \
+          --control-flow-flattening true \
+          --control-flow-flattening-threshold 0.75 \
+          --dead-code-injection true \
+          --dead-code-injection-threshold 0.5 \
+          --identifier-names-generator mangled \
+          --string-array true \
+          --string-array-threshold 0.75 \
+          --unicode-escape-sequence true
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: main
+          commit_message: ':arrow_up: update latest bpb panel'
+          commit_author: 'github-actions[bot] <github-actions[bot]@users.noreply.github.com>'
+          push_options: '--set-upstream'
